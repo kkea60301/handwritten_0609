@@ -1,0 +1,16 @@
+#做完修改執行以下推送
+git remote -v
+git pull
+git add .
+git commit -m "訊息"
+git push
+
+#B電腦同步Github 程式碼
+git pull
+
+#做完修改執行以下推送
+# git init
+# git remote add origin https://github.com/你的帳號/你的repo.git
+git add .
+git commit -m "Initial commit"
+git push -u origin master
