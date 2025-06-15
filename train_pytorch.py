@@ -126,17 +126,32 @@ class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
         # PyTorch 的 Conv2d 輸入格式為 (N, C, H, W)
+        #參數解釋 https://docs.pytorch.org/docs/main/generated/torch.nn.Conv2d.html#torch.nn.Conv2d
+        #https://docs.pytorch.org/docs/main/nn.html#torch.nn.Conv2d
         # 第一個卷積層和池化層
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, padding='same')
+        #卷積層conv1: in_channels=1：輸入通道數為 1(灰階圖片);out_channels=32：輸出 32 個特徵圖; #kernel_size=5：使用 5×5 的卷積核;padding='same'：保持輸入輸出尺寸相同
+        #池化層pool1: MaxPool2d：最大池化，取區域內的最大值;kernel_size=2, stride=2：2×2 的池化窗口，步長為 2，將圖片尺寸縮小一半
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=5, padding='same') 
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         
         # 第二個卷積層和池化層
+        #卷積層conv2: in_channels=32：輸入通道數為 32(來自第一層的輸出);out_channels=32：輸出 32 個特徵圖;kernel_size=5：使用 5×5 的卷積核;padding='same'：保持輸入輸出尺寸相同
+        #池化層pool2: MaxPool2d：最大池化，取區域內的最大值;kernel_size=2, stride=2：2×2 的池化窗口，步長為 2，將圖片尺寸縮小一半
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=5, padding='same')
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
         
         # 全連接層
         # 圖像經過兩次 2x2 池化，尺寸從 28x28 變為 7x7
-        # 展平後的特徵數量為 32 (通道數) * 7 * 7 = 1568
+        # 展平層 (flatten)：將多維的特徵圖轉換成一維向量
+        # 全連接層 fc1: 輸入特徵數量為 32 * 7 * 7 = 1568，輸出特徵數量為 256
+        # Dropout 層：隨機丟棄 50% 的神經元，防止過擬合
+        # 全連接層 fc2: 輸入特徵數量為 256，輸出特徵數量為 10 (對應 10 個類別)
+        # nn.Flatten() 將多維的特徵圖展平為一維向量，方便輸入到全連接層
+        # 在 PyTorch 中，展平層通常使用 nn.Flatten()，它會將輸入的多維張量展平為一維張量
+        # 在這個模型中，展平層的作用是將卷積層和池化層的輸出轉換為一維向量，以便輸入到全連接層進行分類
+        # 注意：展平層不需要指定輸入形狀，因為它會自動根據輸入的形狀進行展平
+        # nn.Linear() 用於建立全連接層，第一個參數是輸入特徵數量，第二個參數是輸出特徵數量
+        # nn.Dropout() 用於建立 Dropout 層，參數是丟棄率 (0.5 表示丟棄 50% 的神經元)
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(32 * 7 * 7, 256)
         self.dropout = nn.Dropout(0.5)
@@ -144,7 +159,22 @@ class CNN(nn.Module):
 
     def forward(self, x):
         """定義模型的前向傳播路徑"""
-        x = F.relu(self.conv1(x))
+        # 第一階段：輸入 → 卷積1 → ReLU 激活 → 池化1
+        # 第二階段：池化1輸出 → 卷積2 → ReLU 激活 → 池化2
+        # 第三階段：池化2輸出 → 展平 → 全連接1 → ReLU 激活 → Dropout → 全連接2 (輸出)
+        # 輸出階段：Dropout輸出 → 全連接2 → 最終預測
+        
+        # x 的形狀應為 (N, 1, 28, 28)，其中 N 是批次大小
+        # 在 PyTorch 中，輸入圖像的形狀應為 (N, C, H, W)，其中 N 是批次大小，C 是通道數，H 是高度，W 是寬度
+        # 在 MNIST 中，C=1 (灰階圖像)，H=28，W=28
+        # 輸入 x 經過第一個卷積層、ReLU 激活函數和池化層   
+        # 然後經過第二個卷積層、ReLU 激活函數和池化層
+        # 最後展平並通過全連接層
+        # 注意：PyTorch 的 nn.Conv2d 和 nn.MaxPool2d 預設使用 'valid' 填充方式，所以不需要額外處理填充
+        # 輸入 x 的形狀應為 (N, 1, 28, 28)，其中 N 是批次大小
+        # 在 PyTorch 中，輸入圖像的形狀應為 (N, C, H, W)，其中 N 是批次大小，C 是通道數，H 是高度，W 是寬度
+        # 在 MNIST 中，C=1 (灰階圖像)，H=28，W=28
+        x = F.relu(self.conv1(x)) #ReLU 激活函式：F.relu() 將負值設為 0，正值保持不變，增加網路的非線性能力
         x = self.pool1(x)
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
@@ -354,7 +384,7 @@ if __name__ == "__main__":
     # 1. 設定
     DEVICE = select_device()
     BATCH_SIZE = 300
-    EPOCHS = 30
+    EPOCHS = 20
     LEARNING_RATE = 0.001
     MODEL_SAVE_PATH = "pytorch_cnn.pth"
 
