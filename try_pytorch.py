@@ -13,7 +13,7 @@ import random # 導入 random 模組
 
 torch.manual_seed(42)
 np.random.seed(42)
-random.seed(2) # 設定 random 模組的種子
+random.seed(42) # 設定 random 模組的種子
 
 def select_device():  #定義函式 - 配置 PyTorch 以使用 GPU 或 CPU
     """
@@ -122,4 +122,5 @@ if __name__ == "__main__":
     train_loader, val_loader, test_loader = get_data_loaders(batch_size=BATCH_SIZE)
     device = select_device()
     print(f"使用的計算設備: {device}") 
+
 
