@@ -8,9 +8,10 @@ git push
 #B電腦同步Github 程式碼
 git pull
 
-#做完修改執行以下推送
-# git init
-# git remote add origin https://github.com/你的帳號/你的repo.git
-git add .
-git commit -m "Initial commit"
-git push -u origin master
+#電腦已有專案資料夾
+git pull
+
+#情況二：A 電腦需要重新下載完整專案
+git clone https://github.com/你的帳號/你的repo.git
+git fetch origin
+git reset --hard origin/main
