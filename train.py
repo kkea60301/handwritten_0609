@@ -36,7 +36,7 @@ def configure_gpu():
         
         while True:
             try:
-                choice = int(input("請輸入您想使用的 GPU 索引 (例如 0, 1, ...): "))
+                choice = int(input("請輸入您想使用的 GPU Index (例如 0, 1, ...): "))
                 if 0 <= choice < len(physical_gpus):
                     selected_gpu = physical_gpus[choice]
                     tf.config.set_visible_devices(selected_gpu, 'GPU')
@@ -47,7 +47,7 @@ def configure_gpu():
                     print("訓練將在 GPU 上運行。")
                     break
                 else:
-                    print("無效的選擇，請輸入正確的 GPU 索引。")
+                    print("無效的選擇，請輸入正確的 GPU Index。")
             except ValueError:
                 print("無效的輸入，請輸入一個數字。")
             except RuntimeError as e:

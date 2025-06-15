@@ -4,24 +4,29 @@
 使用 PyTorch 建立卷積神經網路 (CNN) 模型
 """
 
-# 載入必要的函式庫
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix
-import itertools
-import os
+# 載入必要的函式庫，PyTorch 核心模組
+import torch #PyTorch 的主要模組，提供張量運算和 GPU 計算功能
+import torch.nn as nn #神經網路模組，用來建立模型架構
+import torch.optim as optim #優化器模組，用來更新模型權重，包含各種訓練演算法（如 SGD、Adam 等）
+import torch.nn.functional as F #提供各種神經網路函式，提供各種神經網路函式的功能版本
+
+#以下這些模組專門處理資料
+from torch.utils.data import DataLoader, random_split # DataLoader 用來批次載入資料，random_split 用來隨機分割資料集
+from torchvision import datasets, transforms # datasets 用來載入常用的資料集 (如 MNIST)，transforms 用來對圖像進行轉換和增強
+
+#科學計算與視覺化
+import numpy as np #數值計算函式庫，提供高效的陣列運算
+import matplotlib.pyplot as plt #視覺化函式庫，用來繪製圖表和圖像
+from sklearn.metrics import confusion_matrix # 來自 scikit-learn，用於計算混淆矩陣評估模型性能
+import itertools # itertools 模組提供高效的迭代器工具，這裡用於生成混淆矩陣的索引
+import os # 用於檔案和目錄操作
+import random # 導入 random 模組，用於隨機數生成
 
 # 為了讓實驗可重現，設定隨機種子
 torch.manual_seed(42)
 np.random.seed(42)
 
-def select_device():
+def select_device():  #定義函式 - 配置 PyTorch 以使用 GPU 或 CPU
     """
     配置 PyTorch 以使用 GPU 或 CPU
 
@@ -39,7 +44,7 @@ def select_device():
 
         while True:
             try:
-                choice_str = input(f"請輸入您想使用的 GPU 索引 (0-{num_gpus-1})，或直接按 Enter 使用 CPU: ")
+                choice_str = input(f"請輸入您想使用的 GPU Index (0-{num_gpus-1})，或直接按 Enter 使用 CPU: ")
                 if not choice_str:
                     print("未選擇 GPU。訓練將在 CPU 上運行。")
                     return torch.device("cpu")
@@ -50,14 +55,14 @@ def select_device():
                     print(f"已選擇 GPU {choice} ({torch.cuda.get_device_name(choice)})。")
                     return device
                 else:
-                    print("無效的選擇，請輸入正確的 GPU 索引。")
+                    print("無效的選擇，請輸入正確的 GPU Index。")
             except ValueError:
                 print("無效的輸入，請輸入一個數字。")
     else:
         print("未偵測到 GPU 設備。訓練將在 CPU 上運行。")
         return torch.device("cpu")
 
-def get_data_loaders(batch_size=300):
+def get_data_loaders(batch_size=300): #接受一個參數batch_size（批次大小），預設值是 300。是指每次訓練時同時處理多少張圖片。
     """
     載入 MNIST 資料集並建立訓練、驗證和測試的 DataLoader
 
@@ -69,16 +74,17 @@ def get_data_loaders(batch_size=300):
     """
     # 定義訓練資料的轉換，包括資料增強
     # 數值是根據原 Keras 版本中的設定進行調整
-    train_transform = transforms.Compose([
-        transforms.RandomAffine(degrees=8, translate=(0.08, 0.08), shear=0.3, scale=(0.92, 1.08)),
-        transforms.ToTensor(), # 將圖像轉為 Tensor，並將像素值標準化到 [0, 1]
-        transforms.Normalize((0.1307,), (0.3081,)) # MNIST 資料集的標準化參數
+    # transforms.Compose將多種transforms變換組合在一起
+    train_transform = transforms.Compose([  
+        transforms.RandomAffine(degrees=8, translate=(0.08, 0.08), shear=0.3, scale=(0.92, 1.08)), #隨機對圖片進行旋轉、平移、剪切和縮放，讓模型看到更多變化的圖片
+        transforms.ToTensor(), # 將PIL(Python Imaging Library)圖像轉換成 PyTorch 可以處理的張量格式，並將像素值從 0-255 轉換到 0-1
+        transforms.Normalize((0.1307,), (0.3081,)) # 使用 MNIST 資料集的統計數據進行標準化(pixel_value - mean) / std, NIST的MEAN=0.1307和STD=0.3081
     ])
 
     # 驗證和測試資料只需標準化，不需增強
     test_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))
+        transforms.Normalize((0.1307,), (0.3081,))# 使用 MNIST 資料集的統計數據進行標準化(pixel_value - mean) / std, NIST的MEAN=0.1307和STD=0.3081
     ])
 
     # 下載並載入完整的訓練資料集
@@ -100,15 +106,15 @@ def get_data_loaders(batch_size=300):
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
     
-    # 視覺化部分訓練樣本 (使用未轉換的資料)
-    plt.figure(figsize=(4, 4))
-    for i in range(9):
-        plt.subplot(3, 3, i+1)
-        img, label = vis_dataset[i]
-        plt.imshow(img.squeeze(), cmap="gray") # squeeze() 移除通道維度
-        plt.title(f"Class {label}")
-    plt.tight_layout()
-    plt.show()
+    # # 視覺化部分訓練樣本 (使用未轉換的資料)
+    # plt.figure(figsize=(4, 4))
+    # for i in range(9):
+    #     plt.subplot(3, 3, i+1)
+    #     img, label = vis_dataset[i]
+    #     plt.imshow(img.squeeze(), cmap="gray") # squeeze() 移除通道維度
+    #     plt.title(f"Class {label}")
+    # plt.tight_layout()
+    # plt.show()
 
     return train_loader, val_loader, test_loader
 
