@@ -400,7 +400,7 @@ if __name__ == "__main__":
     # 1. 設定
     DEVICE = select_device()
     BATCH_SIZE = 300
-    EPOCHS = 10
+    EPOCHS = 20
     LEARNING_RATE = 0.001
     MODEL_SAVE_PATH = "pytorch_cnn.pth"
 
