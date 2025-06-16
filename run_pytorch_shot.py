@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from torchvision import transforms
 import numpy as np
 import os
+import matplotlib.pyplot as plt
 
 # 全域變數，用於儲存選取的 ROI 座標 (x, y, w, h)
 g_roi = None
@@ -180,6 +181,9 @@ def process_frame_pytorch(frame, model, device, roi=None):
         prediction = model(input_tensor)
         predicted_prob = F.softmax(prediction, dim=1)
         predicted_digit = torch.argmax(predicted_prob).item()
+        
+        # 顯示機率分佈長條圖
+        draw_probability_bar_chart(predicted_prob)
 
     # --- 在影像上顯示辨識結果 ---
     cv2.putText(
@@ -194,6 +198,34 @@ def process_frame_pytorch(frame, model, device, roi=None):
     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)
     
     return frame
+
+def draw_probability_bar_chart(probabilities):
+    """
+    繪製機率分佈的長條圖
+
+    Args:
+        probabilities (torch.Tensor): 模型的輸出機率分佈 (1x10 的 Tensor)
+    """
+    # 將 Tensor 轉換為 NumPy 陣列
+    probs_np = probabilities.cpu().numpy().flatten()
+
+    # 建立數字標籤 (0-9)
+    labels = [str(i) for i in range(10)]
+
+    # 建立長條圖
+    plt.figure(figsize=(8, 5))
+    plt.bar(labels, probs_np, color='skyblue')
+    plt.xlabel('數字')
+    plt.ylabel('機率')
+    plt.title('數字辨識機率分佈')
+    plt.ylim(0, 1) # 機率範圍在 0 到 1 之間
+    
+    # 在每個長條上方顯示機率值
+    for i, prob in enumerate(probs_np):
+        plt.text(i, prob + 0.02, f'{prob:.2f}', ha='center', va='bottom')
+
+    plt.tight_layout()
+    plt.show()
 
 def is_window_closed(window_name):
     """檢查指定的 OpenCV 視窗是否已關閉"""

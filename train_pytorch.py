@@ -344,7 +344,7 @@ def visualize_predictions(model, device, test_dataset, y_test, predicted_classes
     plt.figure(figsize=(10, 15)) # 調整圖形大小以適應 3x2 佈局 (圖像 + 柱狀圖)
     plt.suptitle("Incorrect Predictions with Probabilities", fontsize=16)
     
-    # 隨機選擇最多 3 個錯誤預測的樣本進行顯示
+    # 隨機選擇錯誤預測的樣本進行顯示
     if len(incorrect_indices) > 0:
         display_indices = random.sample(list(incorrect_indices), min(len(incorrect_indices), 5))
     else:
@@ -400,7 +400,7 @@ if __name__ == "__main__":
     # 1. 設定
     DEVICE = select_device()
     BATCH_SIZE = 300
-    EPOCHS = 10
+    EPOCHS = 8
     LEARNING_RATE = 0.001
     MODEL_SAVE_PATH = "pytorch_cnn.pth"
 
