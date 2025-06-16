@@ -72,27 +72,26 @@ def get_data_loaders(batch_size=300): #接受一個參數batch_size（批次大�
     Returns:
         tuple: 包含訓練、驗證和測試的 DataLoader
     """
+    # MNIST 資料集的標準化參數
+    MEAN = (0.1307,)
+    STD = (0.3081,)
+
     # 定義訓練資料的轉換，包括資料增強
-    # 數值是根據原 Keras 版本中的設定進行調整
-    # transforms.Compose將多種transforms變換組合在一起
-    train_transform = transforms.Compose([  
-        transforms.RandomAffine(degrees=8, translate=(0.08, 0.08), shear=0.3, scale=(0.92, 1.08)), #隨機對圖片進行旋轉、平移、剪切和縮放，讓模型看到更多變化的圖片
-        transforms.ToTensor(), # 將PIL(Python Imaging Library)圖像轉換成 PyTorch 可以處理的張量格式，並將像素值從 0-255 轉換到 0-1
-        transforms.Normalize((0.1307,), (0.3081,)) # 使用 MNIST 資料集的統計數據進行標準化(pixel_value - mean) / std, NIST的MEAN=0.1307和STD=0.3081
+    train_transform = transforms.Compose([
+        transforms.RandomAffine(degrees=8, translate=(0.08, 0.08), shear=0.3, scale=(0.92, 1.08)),
+        transforms.ToTensor(),
+        transforms.Normalize(MEAN, STD)
     ])
 
     # 驗證和測試資料只需標準化，不需增強
     test_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))# 使用 MNIST 資料集的統計數據進行標準化(pixel_value - mean) / std, NIST的MEAN=0.1307和STD=0.3081
+        transforms.Normalize(MEAN, STD)
     ])
 
     # 下載並載入完整的訓練資料集
     full_train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=train_transform)
     
-    # 為了視覺化，我們也載入一份未經轉換的資料
-    vis_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transforms.ToTensor())
-
     # 將訓練資料集分割為訓練集和驗證集 (80/20)
     train_size = int(0.8 * len(full_train_dataset))
     val_size = len(full_train_dataset) - train_size
@@ -106,16 +105,6 @@ def get_data_loaders(batch_size=300): #接受一個參數batch_size（批次大�
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
     
-    # # 視覺化部分訓練樣本 (使用未轉換的資料)
-    # plt.figure(figsize=(4, 4))
-    # for i in range(9):
-    #     plt.subplot(3, 3, i+1)
-    #     img, label = vis_dataset[i]
-    #     plt.imshow(img.squeeze(), cmap="gray") # squeeze() 移除通道維度
-    #     plt.title(f"Class {label}")
-    # plt.tight_layout()
-    # plt.show()
-
     return train_loader, val_loader, test_loader
 
 class CNN(nn.Module):
@@ -225,61 +214,57 @@ def train_and_validate(model, device, train_loader, val_loader, optimizer, crite
     history = {'train_loss': [], 'train_acc': [], 'val_loss': [], 'val_acc': []}
     model.to(device) # 將模型移至指定設備
 
-    for epoch in range(epochs):
-        # --- 訓練模式 ---
-        model.train()
+    def _run_epoch(loader, model, criterion, optimizer=None, is_train=True):
+        """
+        輔助函式：執行一個訓練或驗證週期
+        """
+        if is_train:
+            model.train()
+        else:
+            model.eval()
+
         running_loss, correct_predictions, total_samples = 0.0, 0, 0
         
-        for inputs, labels in train_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
-
-            # 梯度歸零
-            optimizer.zero_grad()
-
-            # 前向傳播
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-
-            # 反向傳播與優化
-            loss.backward()
-            optimizer.step()
-
-            # 統計損失和準確率
-            running_loss += loss.item() * inputs.size(0)
-            _, predicted = torch.max(outputs.data, 1)
-            total_samples += labels.size(0)
-            correct_predictions += (predicted == labels).sum().item()
-
-        epoch_loss = running_loss / total_samples
-        epoch_acc = correct_predictions / total_samples
-        history['train_loss'].append(epoch_loss)
-        history['train_acc'].append(epoch_acc)
-
-        # --- 驗證模式 ---
-        model.eval()
-        val_loss, val_correct, val_total = 0.0, 0, 0
-        with torch.no_grad(): # 在驗證時不計算梯度
-            for inputs, labels in val_loader:
+        with torch.set_grad_enabled(is_train):
+            for inputs, labels in loader:
                 inputs, labels = inputs.to(device), labels.to(device)
+
+                if is_train:
+                    optimizer.zero_grad()
+
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
-                
-                val_loss += loss.item() * inputs.size(0)
-                _, predicted = torch.max(outputs.data, 1)
-                val_total += labels.size(0)
-                val_correct += (predicted == labels).sum().item()
 
-        val_epoch_loss = val_loss / val_total
-        val_epoch_acc = val_correct / val_total
-        history['val_loss'].append(val_epoch_loss)
-        history['val_acc'].append(val_epoch_acc)
+                if is_train:
+                    loss.backward()
+                    optimizer.step()
+
+                running_loss += loss.item() * inputs.size(0)
+                _, predicted = torch.max(outputs.data, 1)
+                total_samples += labels.size(0)
+                correct_predictions += (predicted == labels).sum().item()
+        
+        epoch_loss = running_loss / total_samples
+        epoch_acc = correct_predictions / total_samples
+        return epoch_loss, epoch_acc
+
+    for epoch in range(epochs):
+        # 訓練模式
+        train_loss, train_acc = _run_epoch(train_loader, model, criterion, optimizer, is_train=True)
+        history['train_loss'].append(train_loss)
+        history['train_acc'].append(train_acc)
+
+        # 驗證模式
+        val_loss, val_acc = _run_epoch(val_loader, model, criterion, is_train=False)
+        history['val_loss'].append(val_loss)
+        history['val_acc'].append(val_acc)
 
         # 調整學習率
-        scheduler.step(val_epoch_acc)
+        scheduler.step(val_acc)
 
         print(f"Epoch {epoch+1}/{epochs} | "
-              f"Train Loss: {epoch_loss:.4f}, Train Acc: {epoch_acc:.4f} | "
-              f"Val Loss: {val_epoch_loss:.4f}, Val Acc: {val_epoch_acc:.4f}")
+              f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f} | "
+              f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
         
     return history
 
@@ -346,13 +331,10 @@ def plot_confusion_matrix(cm, classes, normalize=False, title="Confusion Matrix"
     plt.grid(False)
     plt.show()
 
-def visualize_predictions(model, device, y_test, predicted_classes):
+def visualize_predictions(model, device, test_dataset, y_test, predicted_classes):
     """
     視覺化預測結果 (錯誤和正確的範例)
     """
-    # 取得未經標準化的測試圖像
-    raw_test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transforms.ToTensor())
-    
     # 找出錯誤預測的樣本
     incorrect_indices = np.where(y_test != predicted_classes)[0]
     
@@ -371,7 +353,7 @@ def visualize_predictions(model, device, y_test, predicted_classes):
         
     with torch.no_grad():
         for i, idx in enumerate(display_indices):
-            img, true_label = raw_test_dataset[idx]
+            img, true_label = test_dataset[idx]
             input_img = img.unsqueeze(0).to(device)
             outputs = model(input_img)
             probabilities = F.softmax(outputs, dim=1).cpu().numpy().flatten()
@@ -406,7 +388,7 @@ def visualize_predictions(model, device, y_test, predicted_classes):
     plt.suptitle("Correct Predictions", fontsize=16)
     for i, idx in enumerate(correct_indices[:9]):
         plt.subplot(3, 3, i+1)
-        img, label = raw_test_dataset[idx]
+        img, label = test_dataset[idx]
         plt.imshow(img.squeeze(), cmap="gray")
         plt.title(f"Category: {label}")
         plt.axis('off')
@@ -418,12 +400,15 @@ if __name__ == "__main__":
     # 1. 設定
     DEVICE = select_device()
     BATCH_SIZE = 300
-    EPOCHS = 5
+    EPOCHS = 10
     LEARNING_RATE = 0.001
     MODEL_SAVE_PATH = "pytorch_cnn.pth"
 
     # 2. 載入並準備資料
     train_loader, val_loader, test_loader = get_data_loaders(batch_size=BATCH_SIZE)
+    
+    # 為了視覺化，我們也載入一份未經轉換的測試資料
+    raw_test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transforms.ToTensor())
 
     # 3. 建立模型、損失函式和優化器
     model = CNN()
@@ -458,7 +443,7 @@ if __name__ == "__main__":
     plot_confusion_matrix(cm, classes=range(10), normalize=True, title='Normalized Confusion Matrix')
 
     # 7. 視覺化預測
-    visualize_predictions(model, DEVICE, y_test, y_pred)
+    visualize_predictions(model, DEVICE, raw_test_dataset, y_test, y_pred)
     
     # 8. 儲存模型
     torch.save(model.state_dict(), MODEL_SAVE_PATH)
