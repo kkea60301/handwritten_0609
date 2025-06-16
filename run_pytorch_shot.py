@@ -1,7 +1,7 @@
 # 檔名: run_pytorch_shot.py
 """
 手寫數字影像辨識程式 (PyTorch 版本)
-使用攝影機捕捉手寫數字照片，並透過 PyTorch 模型進行辨識
+使用相機捕捉手寫數字照片，並透過 PyTorch 模型進行辨識
 """
 
 import cv2
@@ -29,8 +29,8 @@ DEFAULT_ROI_W = 120
 DEFAULT_ROI_H = 120
 
 # 視窗名稱常數
-MAIN_WINDOW_NAME = 'PyTorch Handwritten Digits Recognition - Press "s" to Shot, "q" to Quit'
-CAPTURED_WINDOW_NAME = 'PyTorch Handwritten Digits Recognition - Captured Image'
+MAIN_WINDOW_NAME = 'Digits Recognition - Press "s" to Shot, "q" to Quit'
+CAPTURED_WINDOW_NAME = 'Handwritten Digits Recognition - Captured Image'
 RESULT_WINDOW_NAME = 'PyTorch Handwritten Digits Recognition - Result'
 
 # --- 模型定義 ---
@@ -119,7 +119,7 @@ def process_frame_pytorch(frame, model, device, roi=None):
     處理視訊幀並使用 PyTorch 模型進行數字辨識
 
     Args:
-        frame: 從攝影機捕捉的原始影像幀
+        frame: 從相機捕捉的原始影像幀
         model: 預訓練的 PyTorch 模型
         device: 計算設備
         roi (tuple, optional): 選取的 ROI 座標 (x, y, w, h)。如果為 None，則使用預設 ROI。
@@ -231,8 +231,22 @@ def is_window_closed(window_name):
     """檢查指定的 OpenCV 視窗是否已關閉"""
     return cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1
 
+def list_available_cameras():
+    """
+    列出所有可用的相機裝置及其編號。
+    返回一個包含可用相機編號的列表。
+    """
+    available_cameras = []
+    # 嘗試開啟從 0 到 9 的相機編號
+    for i in range(10):
+        cap = cv2.VideoCapture(i)
+        if cap.isOpened():
+            available_cameras.append(i)
+            cap.release() # 釋放相機
+    return available_cameras
+
 def main():
-    """主程式：啟動攝影機，拍照後進行手寫數字辨識"""
+    """主程式：啟動相機，拍照後進行手寫數字辨識"""
     MODEL_PATH = "pytorch_cnn.pth"
     
     if not os.path.exists(MODEL_PATH):
@@ -248,11 +262,40 @@ def main():
     model = load_pytorch_model(MODEL_PATH, DEVICE)
     print('模型載入完成，等待拍照...')
     
+    # 列出可用的相機並讓使用者選擇
+    available_cameras = list_available_cameras()
+    if not available_cameras:
+        print("錯誤：找不到任何可用的相機。請確認相機已正確連接。")
+        return
+
+    camera_index = 0
+    if len(available_cameras) > 1:
+        print("偵測到多個相機。以下為相機編號：")
+        for i, cam_idx in enumerate(available_cameras):
+            print(f"  {i+1}. 相機 {cam_idx}")
+        
+        while True:
+            try:
+                choice = int(input("請輸入要使用的相機編號 (例如：1, 2, ...): "))
+                if 1 <= choice <= len(available_cameras):
+                    camera_index = available_cameras[choice - 1]
+                    break
+                else:
+                    print("無效的選擇，請重新輸入。")
+            except ValueError:
+                print("無效的輸入，請輸入數字。")
+    else:
+        print(f"偵測到一個相機：相機編號 {available_cameras[0]}")
+        camera_index = available_cameras[0]
+
     # 啟用攝影鏡頭
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(camera_index)
+
+    # 創建主視窗並設定為可調整大小
+    cv2.namedWindow(MAIN_WINDOW_NAME, cv2.WINDOW_NORMAL)
     
     if not cap.isOpened():
-        print("無法開啟攝影機")
+        print(f"無法開啟相機 {camera_index}")
         cap.release()
         cv2.destroyAllWindows()
         return
@@ -265,8 +308,16 @@ def main():
             cv2.destroyAllWindows()
             break
         
-        # 調整即時影像尺寸
-        frame_display = cv2.resize(frame, (540, 300))
+        # 獲取當前主視窗的尺寸
+        # getWindowImageRect 返回 (x, y, width, height)
+        x, y, window_width, window_height = cv2.getWindowImageRect(MAIN_WINDOW_NAME)
+
+        # 如果視窗尺寸有效 (寬高大於0)，則根據視窗大小調整影像尺寸
+        if window_width > 0 and window_height > 0:
+            frame_display = cv2.resize(frame, (window_width, window_height))
+        else:
+            # 否則，使用預設尺寸 (例如，在視窗剛建立或最小化時)
+            frame_display = cv2.resize(frame, (540, 300))
 
         # 顯示即時影像
         cv2.imshow(MAIN_WINDOW_NAME, frame_display)
