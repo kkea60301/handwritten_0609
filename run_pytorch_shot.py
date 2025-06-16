@@ -215,9 +215,9 @@ def draw_probability_bar_chart(probabilities):
     # 建立長條圖
     plt.figure(figsize=(8, 5))
     plt.bar(labels, probs_np, color='skyblue')
-    plt.xlabel('數字')
-    plt.ylabel('機率')
-    plt.title('數字辨識機率分佈')
+    plt.xlabel('Digits')
+    plt.ylabel('Probability')
+    plt.title('Digit Recognition Probability Distribution')
     plt.ylim(0, 1) # 機率範圍在 0 到 1 之間
     
     # 在每個長條上方顯示機率值
