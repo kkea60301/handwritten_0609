@@ -185,13 +185,18 @@ def show_train_history(history, train_metric, val_metric):
     """
     plt.figure(figsize=(10, 6))
     metric_name = train_metric.split('_')[1].capitalize()
-    plt.plot(history[train_metric], label=f'Train {metric_name}')
-    plt.plot(history[val_metric], label=f'Validation {metric_name}')
+    epochs_range = np.arange(1, len(history[train_metric]) + 1) # 建立從 1 開始的 epoch 範圍用於繪圖和標籤
+    plt.plot(epochs_range, history[train_metric], label=f'Train {metric_name}')
+    plt.plot(epochs_range, history[val_metric], label=f'Validation {metric_name}')
     plt.title("Training History")
     plt.ylabel(metric_name)
-    plt.xlabel('Train cycles (Epoch)')
+    plt.xlabel('Epoch')
     plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.grid(True, linestyle='solid', alpha=0.6)
+    # 確保 x 軸從 1 開始，y 軸從 0 開始
+    plt.xlim(left=1) # 確保 x 軸從 1 開始
+    plt.ylim(bottom=0) # 確保 y 軸從 0 開始
+    plt.xticks(epochs_range) # 設定 x 軸刻度位置和標籤
     plt.show()
 
 def train_and_validate(model, device, train_loader, val_loader, optimizer, criterion, scheduler, epochs=30):
@@ -400,7 +405,7 @@ if __name__ == "__main__":
     # 1. 設定
     DEVICE = select_device()
     BATCH_SIZE = 300
-    EPOCHS = 20
+    EPOCHS = 10
     LEARNING_RATE = 0.001
     MODEL_SAVE_PATH = "pytorch_cnn.pth"
 
