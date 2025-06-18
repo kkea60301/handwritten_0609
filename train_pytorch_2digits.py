@@ -1,4 +1,4 @@
-# 檔名: train_pytorch.py
+# 檔名: train_pytorch_2digits.py
 """
 手寫數字識別模型訓練程式 (PyTorch 版本)
 使用 PyTorch 建立卷積神經網路 (CNN) 模型
@@ -11,8 +11,10 @@ import torch.optim as optim #優化器模組，用來更新模型權重，包含
 import torch.nn.functional as F #提供各種神經網路函式，提供各種神經網路函式的功能版本
 
 #以下這些模組專門處理資料
-from torch.utils.data import DataLoader, random_split # DataLoader 用來批次載入資料，random_split 用來隨機分割資料集
-from torchvision import datasets, transforms # datasets 用來載入常用的資料集 (如 MNIST)，transforms 用來對圖像進行轉換和增強
+from torch.utils.data import DataLoader, Dataset # DataLoader 用來批次載入資料，Dataset 用來建立自訂資料集
+from torchvision import transforms # transforms 用來對圖像進行轉換和增強
+from PIL import Image # 用於圖像處理
+import glob # 用於檔案路徑匹配
 
 #科學計算與視覺化
 import numpy as np #數值計算函式庫，提供高效的陣列運算
@@ -62,9 +64,41 @@ def select_device():  #定義函式 - 配置 PyTorch 以使用 GPU 或 CPU
         print("未偵測到 GPU 設備。訓練將在 CPU 上運行。")
         return torch.device("cpu")
 
+class DoubleMNISTDataset(Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+        self.image_paths = []
+        self.labels = []
+
+        # 遍歷所有類別目錄 (00-99)
+        for i in range(100):
+            label_str = f"{i:02d}" # 格式化為兩位數，例如 00, 01, ..., 99
+            class_dir = os.path.join(root_dir, label_str)
+            if os.path.isdir(class_dir):
+                for img_name in os.listdir(class_dir):
+                    if img_name.endswith('.png'):
+                        img_path = os.path.join(class_dir, img_name)
+                        self.image_paths.append(img_path)
+                        self.labels.append(i) # 將兩位數的字串標籤轉換為整數
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        img_path = self.image_paths[idx]
+        image = Image.open(img_path).convert('L') # 轉換為灰階圖像
+
+        label = self.labels[idx]
+
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label
+
 def get_data_loaders(batch_size=300): #接受一個參數batch_size（批次大小），預設值是 300。是指每次訓練時同時處理多少張圖片。
     """
-    載入 MNIST 資料集並建立訓練、驗證和測試的 DataLoader
+    載入 Double MNIST 資料集並建立訓練、驗證和測試的 DataLoader
 
     Args:
         batch_size (int): 每個批次的圖像數量
@@ -72,13 +106,12 @@ def get_data_loaders(batch_size=300): #接受一個參數batch_size（批次大�
     Returns:
         tuple: 包含訓練、驗證和測試的 DataLoader
     """
-    # MNIST 資料集的標準化參數
+    # Double MNIST 資料集的標準化參數 (假設與 MNIST 相同，或需要重新計算)
+    # 由於是雙位數，圖像內容可能更複雜，但為了保持一致性，暫時沿用 MNIST 的均值和標準差
     MEAN = (0.1307,)
     STD = (0.3081,)
 
     # 定義訓練資料的轉換，包括資料增強
-    # 使用 torchvision.transforms 進行資料增強和標準化
-    # RandomAffine：隨機仿射變換，包括旋轉、平移
     train_transform = transforms.Compose([
         transforms.RandomAffine(degrees=8, translate=(0.08, 0.08), shear=0.3, scale=(0.92, 1.08)),
         transforms.ToTensor(),
@@ -91,16 +124,10 @@ def get_data_loaders(batch_size=300): #接受一個參數batch_size（批次大�
         transforms.Normalize(MEAN, STD)
     ])
 
-    # 下載並載入完整的訓練資料集
-    full_train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=train_transform)
-    
-    # 將訓練資料集分割為訓練集和驗證集 (80/20)
-    train_size = int(0.8 * len(full_train_dataset))
-    val_size = len(full_train_dataset) - train_size
-    train_dataset, val_dataset = random_split(full_train_dataset, [train_size, val_size])
-
-    # 下載並載入測試資料集
-    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=test_transform)
+    # 載入 Double MNIST 資料集
+    train_dataset = DoubleMNISTDataset(root_dir='./data/double_mnist/train', transform=train_transform)
+    val_dataset = DoubleMNISTDataset(root_dir='./data/double_mnist/val', transform=test_transform)
+    test_dataset = DoubleMNISTDataset(root_dir='./data/double_mnist/test', transform=test_transform)
 
     # 建立 DataLoaders
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
@@ -144,9 +171,11 @@ class CNN(nn.Module):
         # nn.Linear() 用於建立全連接層，第一個參數是輸入特徵數量，第二個參數是輸出特徵數量
         # nn.Dropout() 用於建立 Dropout 層，參數是丟棄率 (0.5 表示丟棄 50% 的神經元)
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(32 * 7 * 7, 256)
+        # 圖像經過兩次 2x2 池化，尺寸從 56x28 變為 14x7
+        # 展平後特徵數量為 32 * 14 * 7 = 3136
+        self.fc1 = nn.Linear(32 * 14 * 7, 256) # 調整輸入特徵數量
         self.dropout = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(256, 10) # 輸出層，10個類別
+        self.fc2 = nn.Linear(256, 100) # 輸出層，100個類別 (00-99)
 
     def forward(self, x):
         """定義模型的前向傳播路徑"""
@@ -373,9 +402,9 @@ def visualize_predictions(model, device, test_dataset, y_test, predicted_classes
             
             # 繪製機率柱狀圖
             ax2 = plt.subplot(len(display_indices), 2, 2*i + 2) # 柱狀圖在右側
-            bars = ax2.bar(range(10), probabilities * 100, color='skyblue')
+            bars = ax2.bar(range(100), probabilities * 100, color='skyblue') # 類別數量改為 100
             ax2.set_ylim(0, 100)
-            ax2.set_xticks(range(10))
+            ax2.set_xticks(np.arange(0, 100, 10)) # 調整 x 軸刻度，避免過於密集
             ax2.set_xlabel("Digit")
             ax2.set_ylabel("Probability (%)")
             ax2.set_title("Prediction Probabilities", fontsize=10)
@@ -383,7 +412,8 @@ def visualize_predictions(model, device, test_dataset, y_test, predicted_classes
             # 在柱狀圖上顯示數值
             for bar in bars:
                 yval = bar.get_height()
-                ax2.text(bar.get_x() + bar.get_width()/2, yval + 1, f"{yval:.1f}%", ha='center', va='bottom', fontsize=7)
+                if yval > 5: # 只顯示機率較高的數值，避免重疊
+                    ax2.text(bar.get_x() + bar.get_width()/2, yval + 1, f"{yval:.1f}%", ha='center', va='bottom', fontsize=7)
             
     if len(display_indices) > 0:
         plt.tight_layout(rect=[0, 0, 1, 0.95])
@@ -409,13 +439,13 @@ if __name__ == "__main__":
     BATCH_SIZE = 300
     EPOCHS = 20
     LEARNING_RATE = 0.001
-    MODEL_SAVE_PATH = "pytorch_cnn.pth"
+    MODEL_SAVE_PATH = "pytorch_cnn_2digits.pth" # 修改模型儲存路徑
 
     # 2. 載入並準備資料
     train_loader, val_loader, test_loader = get_data_loaders(batch_size=BATCH_SIZE)
     
     # 為了視覺化，我們也載入一份未經轉換的測試資料
-    raw_test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transforms.ToTensor())
+    raw_test_dataset = DoubleMNISTDataset(root_dir='./data/double_mnist/test', transform=transforms.ToTensor()) # 使用新的資料集類別
 
     # 3. 建立模型、損失函式和優化器
     model = CNN()
@@ -446,8 +476,8 @@ if __name__ == "__main__":
     
     # 6. 分析結果 (混淆矩陣)
     cm = confusion_matrix(y_test, y_pred)
-    plot_confusion_matrix(cm, classes=range(10), title='Confusion Matrix')
-    plot_confusion_matrix(cm, classes=range(10), normalize=True, title='Normalized Confusion Matrix')
+    plot_confusion_matrix(cm, classes=range(100), title='Confusion Matrix') # 類別數量改為 100
+    plot_confusion_matrix(cm, classes=range(100), normalize=True, title='Normalized Confusion Matrix') # 類別數量改為 100
 
     # 7. 視覺化預測
     visualize_predictions(model, DEVICE, raw_test_dataset, y_test, y_pred)

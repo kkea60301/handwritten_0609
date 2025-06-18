@@ -3,6 +3,11 @@ https://steam.oxxostudio.tw/category/python/ai/ai-number-recognizer.html
 https://syshen.medium.com/%E6%94%B9%E5%96%84-cnn-%E8%BE%A8%E8%AD%98%E7%8E%87-dac9fce59b63
 https://github.com/syshen/mnist-cnn/blob/master/mnist-CNN-datagen.ipynb?source=post_page-----dac9fce59b63---------------------------------------
 
+多位數:
+https://github.com/shaohua0116/MultiDigitMNIST
+https://github.com/shakibyzn/two-digit-mnist-recognition
+
+
 #做完修改執行以下推送
 git remote -v
 git pull
