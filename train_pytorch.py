@@ -192,7 +192,7 @@ def show_train_history(history, train_metric, val_metric):
     plt.ylabel(metric_name)
     plt.xlabel('Epoch')
     plt.legend()
-    plt.grid(True, linestyle='solid', alpha=0.6)
+    plt.grid(True, linestyle='solid', alpha=0.4)
     # 確保 x 軸從 1 開始，y 軸從 0 開始
     plt.xlim(left=1) # 確保 x 軸從 1 開始
     plt.ylim(bottom=0) # 確保 y 軸從 0 開始
@@ -405,7 +405,7 @@ if __name__ == "__main__":
     # 1. 設定
     DEVICE = select_device()
     BATCH_SIZE = 300
-    EPOCHS = 10
+    EPOCHS = 20
     LEARNING_RATE = 0.001
     MODEL_SAVE_PATH = "pytorch_cnn.pth"
 
