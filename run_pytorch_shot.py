@@ -291,6 +291,12 @@ def main():
     # 啟用攝影鏡頭
     cap = cv2.VideoCapture(camera_index)
 
+    # 設定相機解析度為 1920x1080
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+    # 設定幀率為 30fps
+    cap.set(cv2.CAP_PROP_FPS, 30)
+
     # 創建主視窗並設定為可調整大小
     cv2.namedWindow(MAIN_WINDOW_NAME, cv2.WINDOW_NORMAL)
     
@@ -313,11 +319,13 @@ def main():
         x, y, window_width, window_height = cv2.getWindowImageRect(MAIN_WINDOW_NAME)
 
         # 如果視窗尺寸有效 (寬高大於0)，則根據視窗大小調整影像尺寸
+        # 注意：這裡不再強制縮放為 540x300，而是使用實際的相機解析度
         if window_width > 0 and window_height > 0:
+            # 確保 frame_display 的尺寸與視窗尺寸匹配，避免顯示問題
             frame_display = cv2.resize(frame, (window_width, window_height))
         else:
-            # 否則，使用預設尺寸 (例如，在視窗剛建立或最小化時)
-            frame_display = cv2.resize(frame, (540, 300))
+            # 否則，使用相機的實際解析度
+            frame_display = frame.copy()
 
         # 顯示即時影像
         cv2.imshow(MAIN_WINDOW_NAME, frame_display)
@@ -392,11 +400,6 @@ def main():
             cap.release()
             cv2.destroyAllWindows()
             break
-    # 釋放資源
-    # 這些行已經在 break 或 return 之前處理，所以可以移除
-    # cap.release()
-    # cv2.destroyAllWindows()
-    # print("程式已結束。")
 
 # 執行主程式
 if __name__ == "__main__":
