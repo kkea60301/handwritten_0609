@@ -391,22 +391,53 @@ def visualize_predictions(model, device, test_dataset, y_test, predicted_classes
 
     # 找出正確預測的樣本
     correct_indices = np.where(y_test == predicted_classes)[0]
-    plt.figure(figsize=(10, 10))
-    plt.suptitle("Correct Predictions", fontsize=16)
-    for i, idx in enumerate(correct_indices[:9]):
-        plt.subplot(3, 3, i+1)
-        img, label = test_dataset[idx]
-        plt.imshow(img.squeeze(), cmap="gray")
-        plt.title(f"Category: {label}")
-        plt.axis('off')
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.show()
+    
+    plt.figure(figsize=(10, 15)) # 調整圖形大小以適應 3x2 佈局 (圖像 + 柱狀圖)
+    plt.suptitle("Correct Predictions with Probabilities", fontsize=16)
+    
+    # 隨機選擇正確預測的樣本進行顯示
+    if len(correct_indices) > 0:
+        display_indices_correct = random.sample(list(correct_indices), min(len(correct_indices), 5))
+    else:
+        display_indices_correct = []
+        print("沒有正確預測的樣本可供視覺化。")
+        
+    with torch.no_grad():
+        for i, idx in enumerate(display_indices_correct):
+            img, true_label = test_dataset[idx]
+            input_img = img.unsqueeze(0).to(device)
+            outputs = model(input_img)
+            probabilities = F.softmax(outputs, dim=1).cpu().numpy().flatten()
+            
+            # 繪製圖像
+            ax1 = plt.subplot(len(display_indices_correct), 2, 2*i + 1) # 圖像在左側
+            ax1.imshow(img.squeeze(), cmap="gray")
+            ax1.set_title(f"Real: {true_label} / Predict: {predicted_classes[idx]}", fontsize=10)
+            ax1.axis('off')
+            
+            # 繪製機率柱狀圖
+            ax2 = plt.subplot(len(display_indices_correct), 2, 2*i + 2) # 柱狀圖在右側
+            bars = ax2.bar(range(10), probabilities * 100, color='lightgreen')
+            ax2.set_ylim(0, 100)
+            ax2.set_xticks(range(10))
+            ax2.set_xlabel("Digit")
+            ax2.set_ylabel("Probability (%)")
+            ax2.set_title("Prediction Probabilities", fontsize=10)
+            
+            # 在柱狀圖上顯示數值
+            for bar in bars:
+                yval = bar.get_height()
+                ax2.text(bar.get_x() + bar.get_width()/2, yval + 1, f"{yval:.1f}%", ha='center', va='bottom', fontsize=7)
+            
+    if len(display_indices_correct) > 0:
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.show()
 
 # 主程式執行流程
 if __name__ == "__main__":
     # 1. 設定
     DEVICE = select_device()
-    BATCH_SIZE = 300
+    BATCH_SIZE = 150
     EPOCHS = 20
     LEARNING_RATE = 0.001
     MODEL_SAVE_PATH = "pytorch_cnn.pth"

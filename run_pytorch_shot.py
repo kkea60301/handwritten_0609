@@ -292,8 +292,8 @@ def main():
     cap = cv2.VideoCapture(camera_index)
 
     # 設定相機解析度為 1920x1080
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     # 設定幀率為 30fps
     cap.set(cv2.CAP_PROP_FPS, 30)
 
